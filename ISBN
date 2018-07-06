@@ -1,0 +1,45 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BusinessRules
+{
+    public class ISBN
+    {
+        /// <summary>
+        /// 0th index returns ISBN10, 1st index ISBN13
+        /// </summary>
+        /// <param name="Barcode"></param>
+        /// <returns></returns>
+        public static string[] Convert(string Barcode)
+        {
+            if (Barcode.Length != 13)
+                return null;
+
+            string[] ISBN = new string[2];  //  [0]=ISBN10, [1]=ISBN13
+
+            int totalISNB10 = 0, totalISBN13 = 0;
+            string tempBarkod = Barcode.Substring(0, 12);    //  For ISBN13
+            for (int i = 0; i < 12; i++)    //  For ISBN13
+                if (i % 2 == 0)
+                    totalISBN13 += System.Convert.ToInt32(tempBarkod[i].ToString());
+                else
+                    totalISBN13 += System.Convert.ToInt32(tempBarkod[i].ToString()) * 3;
+
+            tempBarkod = Barcode.Substring(3, 9);            //  For ISBN10
+            for (int i = 0; i < 9; i++)     //  ISBN10 Calculation
+                totalISNB10 += System.Convert.ToInt32(tempBarkod[i].ToString()) * (10 - i);
+
+            totalISBN13 = totalISBN13 % 10;
+            totalISNB10 = totalISNB10 % 11;
+
+            /*  If value of the totalISBN10 is 0(zero), last digit will be also 0(zero)
+             *  If value of the totalISBN10 is 1(one), last digit will be X. */
+            ISBN[0] = totalISNB10 == 0 ? tempBarkod + "0" : totalISNB10 == 1 ? tempBarkod + "X" : tempBarkod + (11 - totalISNB10);
+            ISBN[1] = totalISBN13 != 0 ? "978" + tempBarkod + (10 - totalISBN13) : "978" + tempBarkod + "0";
+            return ISBN;
+        }
+    }
+}
