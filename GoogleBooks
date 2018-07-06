@@ -1,0 +1,39 @@
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BusinessRules
+{
+    public class GoogleBooks
+    {
+        public GoogleBooks()
+        {
+
+        }
+
+        #region Google Books Key
+        private string GoogleBooksKey = ConfigurationManager.AppSettings["GoogleBooksKey"];
+        #endregion
+
+        public string Search(string ISBN13)
+        {
+            string JSONData = "";
+            try
+            {
+                WebClient client = new WebClient();
+                JSONData = client.DownloadString("https://www.googleapis.com/books/v1/volumes?q=isbn:" + ISBN13 + "&key=" + GoogleBooksKey);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
+            return JSONData;
+        }
+    }
+}
