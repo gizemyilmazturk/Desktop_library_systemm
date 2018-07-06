@@ -1,0 +1,66 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+
+namespace BusinessRules
+{
+    public class Validation
+    {
+        public static bool Email(string EmailAddress)
+        {
+            return Regex.IsMatch(EmailAddress, @"\A(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\Z");
+        }
+
+        public static bool ISBN13(string ISBN13)
+        {
+            return Regex.IsMatch(ISBN13, "^[0-9]+$");
+        }
+
+        public static string Number(string Input)
+        {
+            if (Input == null)
+                return null;
+            return Input.Replace(" ", string.Empty);
+        }
+
+        public static bool InternetConnection()
+        {
+            try
+            {
+                WebClient client = new WebClient();
+                Stream stream = client.OpenRead("http://www.google.com");
+                return true;
+            }
+            catch (WebException)
+            {
+                return false;
+            }
+        }
+
+        public static Object CheckIsNull(object Object)
+        {
+            if (Object != null)
+                return Object;
+            else
+                return DBNull.Value;
+        }
+
+        public static bool Integer(string Value)
+        {
+            try
+            {
+                Convert.ToInt32(Value);
+            }
+            catch
+            {
+                return false;
+            }
+            return true;
+        }
+    }
+}
