@@ -1,0 +1,111 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using DataAccess;
+using System.Runtime.InteropServices;
+
+namespace UI.Desktop
+{
+    public partial class BankAccountForm : Form
+    {
+        private int OwnerID;
+        private BankAccount BankAccount;
+
+        #region Constructors
+        public BankAccountForm()
+        {
+            InitializeComponent();
+        }
+
+        //  For Add
+        public BankAccountForm(int OwnerID)
+        {
+            InitializeComponent();
+            this.OwnerID = OwnerID;
+        }
+
+        //  For Update
+        public BankAccountForm(BankAccount BankAccount)
+        {
+            InitializeComponent();
+            this.BankAccount = BankAccount;
+        }
+        #endregion
+
+        private void BankAccountForm_Load(object sender, EventArgs e)
+        {
+            if (BankAccount != null)
+            {
+                txtBankName.Text = BankAccount.BankName;
+                txtBankIBAN.Text = BankAccount.IBAN;
+                txtBranchCode.Text = BankAccount.BranchCode;
+                txtAccountNumber.Text = BankAccount.AccountNumber;
+                cbActive.Checked = BankAccount.IsActive;
+                btnAdd.Text = "Update";
+                groupBoxAddNewBankAccount.Text = "Update Bank Account";
+            }
+        }
+
+        private void btnAdd_Click(object sender, EventArgs e)
+        {
+            #region Add
+            if (btnAdd.Text == "Add")
+                if (txtBankName.Text.Trim() != "" && txtBankIBAN.Text.Trim() != "" && txtBranchCode.Text.Trim() != "" && txtAccountNumber.Text.Trim() != "")
+                {
+                    BankAccount bankAccount = new BankAccount();
+                    bankAccount.OwnerID = OwnerID;
+                    bankAccount.BankName = txtBankName.Text.Trim();
+                    bankAccount.IBAN = txtBankIBAN.Text.Trim();
+                    bankAccount.BranchCode = txtBranchCode.Text.Trim();
+                    bankAccount.AccountNumber = txtAccountNumber.Text.Trim();
+                    bankAccount.CreatedAt = DateTime.Now;
+                    bankAccount.IsActive = cbActive.Checked;
+                    bankAccount.IsDeleted = false;
+
+                    if (bankAccount.Save())
+                    {
+                        MessageBox.Show("Bank account informations have been recorded successfully.", "Record", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        
+                    }
+                    else
+                        MessageBox.Show("Please make sure there is an internet connection.", "Record Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                    MessageBox.Show("Please fill the required fields.", "Record Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            #endregion
+
+            #region Update
+            else if (btnAdd.Text == "Update")
+                if (txtBankName.Text.Trim() != "" && txtBankIBAN.Text.Trim() != "" && txtBranchCode.Text.Trim() != "" && txtAccountNumber.Text.Trim() != "")
+                {
+                    BankAccount bankAccount = new BankAccount();
+                    bankAccount.ID = this.BankAccount.ID;
+                    bankAccount.BankName = txtBankName.Text.Trim();
+                    bankAccount.IBAN = txtBankIBAN.Text.Trim();
+                    bankAccount.BranchCode = txtBranchCode.Text.Trim();
+                    bankAccount.AccountNumber = txtAccountNumber.Text.Trim();
+                    bankAccount.CreatedAt = DateTime.Now;
+                    bankAccount.IsActive = cbActive.Checked;
+
+                    if (bankAccount.Update())
+                        MessageBox.Show("Bank account informations have been updated successfully.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    else
+                        MessageBox.Show("Please make sure there is an internet connection.", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                    MessageBox.Show("Please fill the required fields.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            #endregion
+        }
+
+        private void btnExit_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+    }
+}
