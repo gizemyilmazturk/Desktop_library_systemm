@@ -1,0 +1,920 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Configuration;
+using BusinessRules;
+using DataAccess;
+using System.IO;
+using System.Net;
+using System.Threading;
+using System.Diagnostics;
+
+namespace UI.Desktop
+{
+    public partial class MainForm : Form
+    {
+        Owner owner = new Owner();
+        Bookstore bookstore = new Bookstore();
+        Book book = new Book();
+        Category category = new Category();
+        SubCategory subCategory = new SubCategory();
+
+        bool bookSearched = false;
+        bool BookOperationsClicked = false;
+        bool ManagerOperationsClicked = false;
+
+        bool authorization = false;
+        public static bool InternetConnection = false;
+
+        bool bookSearchedFailed = false;
+
+        #region Constructors
+        public MainForm()
+        {
+            InitializeComponent();
+        }
+        #endregion
+
+        #region Other Event Handlers
+        private void frmMain_Load(object sender, EventArgs e)
+        {
+            CheckForIllegalCrossThreadCalls = false;
+            timerInternetConnection.Start();
+            txtEmail.Text = "gizem@gmail.com";
+            txtPassword.Text = "11111111";
+        }
+
+
+        private void tabControlAdminProfile_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            int selectedIndex = tabControlAdminProfile.SelectedIndex;
+            if (selectedIndex == 0)
+                bookstoreProfileToolStripMenuItem_Click(null, null);
+            else if (selectedIndex == 1)
+                managerProfileToolStripMenuItem_Click(null, null);
+            else if (selectedIndex == 2)
+                updateEmailToolStripMenuItem_Click(null, null);
+            else if (selectedIndex == 3)
+                updatePasswordToolStripMenuItem_Click(null, null);
+            else if (selectedIndex == 4)
+                bankAccountsToolStripMenuItem_Click(null, null);
+            else if (selectedIndex == 5)
+                ordersToolStripMenuItem_Click(null, null);
+        }
+
+        private void tabControlBookOperations_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            int selectedIndex = tabControlBookOperations.SelectedIndex;
+            if (selectedIndex == 0)
+                addToolStripMenuItem_Click(null, null);
+            else if (selectedIndex == 1)
+                updateDeleteToolStripMenuItem_Click(null, null);
+        }
+
+        private void txtOwnerNewPassword_Click(object sender, EventArgs e)
+        {
+            toolTipNewPassword.Show("Password must consists of at least 8 characters.", txtOwnerNewPassword, new Point(210, 0), 5000);
+        }
+
+        private void txtOwnerNewPasswordConfirm_Click(object sender, EventArgs e)
+        {
+            toolTipNewPassword.Show("Password must consists of at least 8 characters.", txtOwnerNewPasswordConfirm, new Point(210, 0), 5000);
+        }
+
+        private void txtOwnerNewPassword_GotFocus(object sender, EventArgs e)
+        {
+            toolTipNewPassword.Show("Password must consists of at least 8 characters.", txtOwnerNewPassword, new Point(210, 0), 5000);
+        }
+
+        private void txtOwnerNewPasswordConfirm_GotFocus(object sender, EventArgs e)
+        {
+            toolTipNewPassword.Show("Password must consists of at least 8 characters.", txtOwnerNewPasswordConfirm, new Point(210, 0), 5000);
+        }
+
+        private void lvBankAccountList_ColumnWidthChanging(object sender, ColumnWidthChangingEventArgs e)
+        {
+            e.Cancel = true;
+            e.NewWidth = lvBankAccountList.Columns[e.ColumnIndex].Width;
+        }
+
+        private void addNewToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            btnAddNewBankAccount_Click(null, null);
+        }
+
+        private void updateToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            btnUpdateBankAccount_Click(null, null);
+        }
+
+        private void deleteToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            btnDeleteBankAccount_Click(null, null);
+        }
+
+        private void dgvBookList_DoubleClick(object sender, EventArgs e)
+        {
+            btnBookUpdate_Click(null, null);
+        }
+
+        private void lvBankAccountList_DoubleClick(object sender, EventArgs e)
+        {
+            btnUpdateBankAccount_Click(null, null);
+        }
+
+
+        #endregion
+
+        #region Tool Strip Menu Items
+        private void homeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CloseAllPanel(panelOptions);
+        }
+
+        private void loginToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!authorization)
+            {
+                CloseAllPanel(panelLogin);
+                loginToolStripMenuItem.Enabled = false;
+                txtEmail.Focus();
+                this.AcceptButton = btnLogin;
+            }
+        }
+
+        private void logoutToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (authorization)
+            {
+                DialogResult result = MessageBox.Show("Do you want to end the session?", "Logout", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                if (result.Equals(DialogResult.Yes))
+                {
+                    authorization = false;
+                    CloseAllPanel(panelSessionEnded, panelGoToLogin);
+                    ChangeStripItemsEnableDisable(false);
+                    loginToolStripMenuItem.Enabled = true;
+
+                    //  Re-Initialize
+                    this.owner = new Owner();
+                    this.bookstore = new Bookstore();
+                }
+            }
+        }
+
+        private void addToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (tabControlBookOperations.SelectedIndex != 0)
+            {
+                tabControlBookOperations.SelectTab(0);
+
+                if (BookOperationsClicked)
+                    return;
+                else
+                {
+                    BookOperationsClicked = true;
+                    tabControlBookOperations_SelectedIndexChanged(null, null);
+                    return;
+                }
+            }
+
+            CloseAllPanel(panelBookOperations);
+            if (!bookSearched)
+                ClearBookSaveFields();
+        }
+
+        private void updateDeleteToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (tabControlBookOperations.SelectedIndex != 1)
+            {
+                tabControlBookOperations.SelectTab(1);
+
+                if (BookOperationsClicked)
+                    return;
+                else
+                {
+                    BookOperationsClicked = true;
+                    tabControlBookOperations_SelectedIndexChanged(null, null);
+                    return;
+                }
+            }
+
+            CloseAllPanel(panelBookOperations);
+
+            dgvBookList.Rows.Clear();
+            List<Book> updateList = new Book().GetAllByBookstoreID(this.bookstore.ID);
+
+            for (int i = 0; i < updateList.Count; i++)
+                dgvBookList.Rows.Add(
+                    updateList[i].ID,
+                    updateList[i].Name,
+                    updateList[i].Author,
+                    updateList[i].PublishedDate,
+                    updateList[i].Publisher,
+                    updateList[i].PageCount,
+                    updateList[i].Language,
+                    updateList[i].Category,
+                    updateList[i].SubCategory,
+                    updateList[i].Price,
+                    updateList[i].Stock,
+                    updateList[i].CreatedAt);
+
+            dgvBookList.Columns[3].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;      //  Published Date
+            dgvBookList.Columns[5].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;      //  Page Count
+            dgvBookList.Columns[10].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;     //  Stock
+            dgvBookList.Columns[9].DefaultCellStyle.Format = "N2";                                              //  Price
+
+            txtTotalBookRecords.Text = dgvBookList.Rows.Count.ToString();
+        }
+
+        private void bookstoreProfileToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (tabControlAdminProfile.SelectedIndex != 0)
+            {
+                tabControlAdminProfile.SelectedIndex = 0;
+
+                if (ManagerOperationsClicked)
+                    return;
+                else
+                {
+                    ManagerOperationsClicked = true;
+                    tabControlAdminProfile_SelectedIndexChanged(null, null);
+                    return;
+                }
+            }
+
+            CloseAllPanel(panelManagerOperations);
+            Bookstore bookstore = new Bookstore();
+            bookstore.Get(owner.ID);
+            this.bookstore.ID = bookstore.ID;
+            lblBookstoreID.Text = bookstore.ID.ToString();
+            txtBookstoreName.Text = bookstore.Name;
+            if (bookstore.FoundationDate == null)
+            {
+                dateTimePickerFoundationDate.Value = DateTime.Now;
+                dateTimePickerFoundationDate.Checked = false;
+            }
+            else
+                dateTimePickerFoundationDate.Value = bookstore.FoundationDate.Value;
+            txtCountryPhoneCode.Text = bookstore.CountryPhoneCode;
+            txtPhoneNumber.Text = bookstore.PhoneNumber;
+            rtxtAdditionalInfo.Text = bookstore.AdditionalInfo;
+
+            txtBookstoreName.Focus();
+            this.AcceptButton = btnUpdateBookstoreProfile;
+        }
+
+        private void managerProfileToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (tabControlAdminProfile.SelectedIndex != 1)
+            {
+                tabControlAdminProfile.SelectedIndex = 1;
+
+                if (ManagerOperationsClicked)
+                    return;
+                else
+                {
+                    ManagerOperationsClicked = true;
+                    tabControlAdminProfile_SelectedIndexChanged(null, null);
+                    return;
+                }
+            }
+
+            CloseAllPanel(panelManagerOperations);
+            Owner owner = new Owner();
+            owner.ID = this.owner.ID;
+            owner.Get();
+            txtOwnerFirstName.Text = owner.FirstName;
+            txtOwnerLastName.Text = owner.LastName;
+            txtOwnerCountryPhoneCode.Text = owner.CountryPhoneCode;
+            txtOwnerPhoneNumber.Text = owner.PhoneNumber;
+            txtOwnerAccountCreatedAt.Text = owner.CreatedAt.ToString("dd MMMM yyyy");
+
+            if (owner.Birthdate == null)
+            {
+                dateTimePickerOwnerBirthdate.Value = DateTime.Now;
+                dateTimePickerOwnerBirthdate.Checked = false;
+            }
+            else
+                dateTimePickerOwnerBirthdate.Value = owner.Birthdate.Value;
+
+            txtOwnerFirstName.Focus();
+            this.AcceptButton = btnUpdateOwnerProfile;
+        }
+
+        private void updateEmailToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (tabControlAdminProfile.SelectedIndex != 2)
+            {
+                tabControlAdminProfile.SelectedIndex = 2;
+
+                if (ManagerOperationsClicked)
+                    return;
+                else
+                {
+                    ManagerOperationsClicked = true;
+                    tabControlAdminProfile_SelectedIndexChanged(null, null);
+                    return;
+                }
+            }
+
+            CloseAllPanel(panelManagerOperations);
+            txtOwnerEmailConfirm.Text = "";
+            txtOwnerPasswordToUpdateEmail.Text = "";
+
+            Owner o = new Owner();
+            o.ID = this.owner.ID;
+            o.GetEmail();
+            txtOwnerEmail.Text = this.owner.Email = o.Email;
+
+            txtOwnerEmail.Focus();
+            this.AcceptButton = btnUpdateOwnerEmail;
+        }
+
+        private void updatePasswordToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (tabControlAdminProfile.SelectedIndex != 3)
+            {
+                tabControlAdminProfile.SelectedIndex = 3;
+
+                if (ManagerOperationsClicked)
+                    return;
+                else
+                {
+                    ManagerOperationsClicked = true;
+                    tabControlAdminProfile_SelectedIndexChanged(null, null);
+                    return;
+                }
+            }
+
+            CloseAllPanel(panelManagerOperations);
+            txtOwnerCurrentPassword.Clear();
+            txtOwnerNewPassword.Clear();
+            txtOwnerNewPasswordConfirm.Clear();
+            txtOwnerCurrentPassword.Focus();
+            this.AcceptButton = btnUpdateOwnerPassword;
+        }
+
+        private void bankAccountsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (tabControlAdminProfile.SelectedIndex != 4)
+            {
+                tabControlAdminProfile.SelectedIndex = 4;
+
+                if (ManagerOperationsClicked)
+                    return;
+                else
+                {
+                    ManagerOperationsClicked = true;
+                    tabControlAdminProfile_SelectedIndexChanged(null, null);
+                    return;
+                }
+            }
+            CloseAllPanel(panelManagerOperations);
+            FillListViewBankAccounts();
+        }
+
+        private void ordersToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (tabControlAdminProfile.SelectedIndex != 5)
+            {
+                tabControlAdminProfile.SelectedIndex = 5;
+
+                if (ManagerOperationsClicked)
+                    return;
+                else
+                {
+                    ManagerOperationsClicked = true;
+                    tabControlAdminProfile_SelectedIndexChanged(null, null);
+                    return;
+                }
+            }
+
+            CloseAllPanel(panelManagerOperations);
+
+            dgvTotalOrders.Rows.Clear();
+            List<Order> list = new Order().Get(this.bookstore.ID);
+
+            for (int i = 0; i < list.Count; i++)
+                dgvTotalOrders.Rows.Add(
+                    list[i].ID,
+                    list[i].CustomerFirstName,
+                    list[i].CustomerLastName,
+                    list[i].CustomerAddressFullAddress,
+                    list[i].CustomerAddressZipCode,
+                    list[i].CustomerAddressDistrict,
+                    list[i].CustomerAddressCity,
+                    list[i].CustomerAddressCountry,
+                    list[i].TotalPrice,
+                    list[i].OrderedAt);
+
+            dgvTotalOrders.Columns[4].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgvTotalOrders.Columns[8].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgvTotalOrders.Columns[8].DefaultCellStyle.Format = "N2";
+
+            txtTotalOrders.Text = dgvTotalOrders.Rows.Count.ToString();
+        }
+
+
+
+        private void minimizeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            this.WindowState = FormWindowState.Minimized;
+        }
+
+        private void exitToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (authorization)
+            {
+                DialogResult result = MessageBox.Show("Do you want to exit?", "Exit", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                if (result.Equals(DialogResult.Yes))
+                    Application.Exit();
+            }
+            else
+                Application.Exit();
+        }
+        #endregion
+
+        #region Buttons
+        private void btnLogin_Click(object sender, EventArgs e)
+        {
+
+            if (txtEmail.Text.Trim() != "" && txtPassword.Text.Trim() != "")
+                if (txtPassword.Text.Trim().Length >= 8 && Validation.Email(txtEmail.Text.Trim()))
+                    if (this.owner.GetID(txtEmail.Text.Trim()) != -1)
+                    {
+                        AccountInfo ai = new AccountInfo();
+                        ai.GetAccountInformations(this.owner.ID, UserType.Owner);
+
+                        if (ai.AccountInfoID != 0)
+                            if (Encryption.CheckInfo(txtPassword.Text.Trim(), ai.SaltPassword, ai.HashPassword))
+                            {
+                                this.bookstore.Get(this.owner.ID);
+                                authorization = true;
+                                CloseAllPanel(panelOptions, panelOptionBookManagement, panelOptionManagerOperation);
+                                ChangeStripItemsEnableDisable(true);
+                                loginToolStripMenuItem.Enabled = false;
+                                txtEmail.Clear();
+                                txtPassword.Clear();
+                            }
+                            else
+                                MessageBox.Show("Authentication failed. You entered an incorrect email or password.", "Login Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        else
+                            MessageBox.Show("Something went wrong with your account. Please make sure your account is activated.", "Login Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                        MessageBox.Show("Authentication failed. You entered an incorrect email or password.", "Login Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                else
+                    MessageBox.Show("Authentication failed. You entered an incorrect email or password.", "Login Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else
+                MessageBox.Show("Please fill the required fields in order to login the system.", "Login Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnRegister_Click(object sender, EventArgs e)
+        {
+            DialogResult dr = MessageBox.Show("You will be redirected to \"www.SahaflarCarsisi.org\" for registration.\nDo you want to continue?", "Redirecting", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (dr == DialogResult.Yes)
+                Process.Start("http://www.sahaflarcarsisi.org");
+        }
+
+        private void btnGoToManagerOperations_Click(object sender, EventArgs e)
+        {
+            bookstoreProfileToolStripMenuItem_Click(null, null);
+        }
+
+        private void btnGoToBookManagement_Click(object sender, EventArgs e)
+        {
+            addToolStripMenuItem_Click(null, null);
+        }
+
+        private void btnGoToLogin_Click(object sender, EventArgs e)
+        {
+            loginToolStripMenuItem_Click(null, null);
+        }
+
+        private void btnUpdateBookstoreProfile_Click(object sender, EventArgs e)
+        {
+            if (txtBookstoreName.Text.Trim() != "" && txtCountryPhoneCode.Text.Trim() != "" && txtPhoneNumber.Text.Trim() != "")
+            {
+
+                Bookstore bookstore = new Bookstore();
+                bookstore.ID = Convert.ToInt32(lblBookstoreID.Text);
+                bookstore.OwnerID = owner.ID;
+                bookstore.Name = txtBookstoreName.Text.Trim();
+                bookstore.FoundationDate = dateTimePickerFoundationDate.Checked ? dateTimePickerFoundationDate.Value : new DateTime?();
+                bookstore.CountryPhoneCode = txtCountryPhoneCode.Text.Trim();
+                bookstore.PhoneNumber = txtPhoneNumber.Text.Trim();
+                bookstore.AdditionalInfo = rtxtAdditionalInfo.Text.Trim();
+                bookstore.LogoURL = this.bookstore.LogoURL;
+
+                if (bookstore.Update())
+                {
+                    MessageBox.Show("Bookstore informations have been updated successfully.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    bookstoreProfileToolStripMenuItem_Click(null, null);
+                }
+                else
+                    MessageBox.Show("Please make sure there is an internet connection.", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+            }
+            else
+                MessageBox.Show("Please fill the required fields.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnUpdateOwnerProfile_Click(object sender, EventArgs e)
+        {
+            if (txtOwnerFirstName.Text.Trim() != "" && txtOwnerLastName.Text.Trim() != "" && txtOwnerCountryPhoneCode.Text.Trim() != "" && txtOwnerPhoneNumber.Text.Trim() != "")
+            {
+                Owner o = new Owner();
+                o.ID = this.owner.ID;
+                o.FirstName = txtOwnerFirstName.Text.Trim();
+                o.LastName = txtOwnerLastName.Text.Trim();
+                o.CountryPhoneCode = txtOwnerCountryPhoneCode.Text.Trim();
+                o.PhoneNumber = txtOwnerPhoneNumber.Text.Trim();
+                o.Birthdate = dateTimePickerOwnerBirthdate.Checked ? dateTimePickerOwnerBirthdate.Value : new DateTime?();
+                if (o.Update())
+                    MessageBox.Show("Manager informations have been updated successfully.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                else
+                    MessageBox.Show("Please make sure there is an internet connection.", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            else
+                MessageBox.Show("Please fill the required fields.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnUpdateOwnerEmail_Click(object sender, EventArgs e)
+        {
+            if (txtOwnerEmail.Text.Trim() != "" && txtOwnerEmailConfirm.Text.Trim() != "" && txtOwnerPasswordToUpdateEmail.Text.Trim() != "")
+                if (Validation.Email(txtOwnerEmail.Text.Trim()) && Validation.Email(txtOwnerEmailConfirm.Text.Trim()))
+                    if (txtOwnerEmail.Text.Trim() == txtOwnerEmailConfirm.Text.Trim())
+                    {
+                        Owner o = new Owner();
+                        o.ID = this.owner.ID;
+                        o.Email = txtOwnerEmail.Text.Trim();
+
+                        if (!o.MailExist() || this.owner.Email == txtOwnerEmail.Text.Trim())
+                        {
+                            o.GetAccountInformations(o.ID, UserType.Owner);
+                            if (Encryption.CheckInfo(txtOwnerPasswordToUpdateEmail.Text.Trim(), o.SaltPassword, o.HashPassword))
+                            {
+                                if (o.UpdateEmail())
+                                {
+                                    MessageBox.Show("Manager email has been updated successfully.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    updateEmailToolStripMenuItem_Click(null, null);
+                                }
+                                else
+                                    MessageBox.Show("Please make sure there is an internet connection.", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                            else
+                                MessageBox.Show("Invalid password. Please make sure password is filled out correctly.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                        else
+                            MessageBox.Show("\"" + txtOwnerEmail.Text.Trim() + "\" is already in use by another user. Please try with different email.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                        MessageBox.Show("Email fields do not match. Please make sure all required fields are filled out correctly.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                else
+                    MessageBox.Show("Email fields are invalid. Please make sure all required fields are filled out correctly.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else
+                MessageBox.Show("Please fill the required fields.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnUpdateOwnerPassword_Click(object sender, EventArgs e)
+        {
+            if (txtOwnerCurrentPassword.Text.Trim() != "" && txtOwnerNewPassword.Text.Trim() != "" && txtOwnerNewPasswordConfirm.Text.Trim() != "")
+                if (txtOwnerNewPassword.Text.Trim() == txtOwnerNewPasswordConfirm.Text.Trim())
+                {
+                    if (txtOwnerNewPassword.Text.Trim().Length >= 8)
+                    {
+                        if (txtOwnerCurrentPassword.Text.Trim().Length >= 8)
+                        {
+                            Owner o = new Owner();
+                            o.ID = this.owner.ID;
+                            o.GetAccountInformations(o.ID, UserType.Owner);
+                            if (Encryption.CheckInfo(txtOwnerCurrentPassword.Text.Trim(), o.SaltPassword, o.HashPassword))
+                            {
+                                o.SaltPassword = Encryption.SaltData();
+                                o.HashPassword = Encryption.MD5(txtOwnerNewPassword.Text.Trim(), o.SaltPassword);
+                                if (o.Update(o, UserType.Owner))
+                                {
+                                    MessageBox.Show("Manager password has been updated successfully.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    updatePasswordToolStripMenuItem_Click(null, null);
+                                }
+                                else
+                                    MessageBox.Show("Please make sure there is an internet connection.", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                            else
+                                MessageBox.Show("Please make sure current password is correct.", "Authorization Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                        else
+                            MessageBox.Show("Please make sure current password is correct.", "Authorization Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                        MessageBox.Show("New password must consists of at least 8 characters.", "Validation Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                else
+                    MessageBox.Show("New password fields do not match.", "Mismatch Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else
+                MessageBox.Show("Please fill the required fields.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnAddNewBankAccount_Click(object sender, EventArgs e)
+        {
+            BankAccountForm baf = new BankAccountForm(this.owner.ID);
+            baf.ShowDialog();
+            bankAccountsToolStripMenuItem_Click(null, null);
+        }
+
+        private void btnUpdateBankAccount_Click(object sender, EventArgs e)
+        {
+            if (lvBankAccountList.SelectedItems.Count != 0)
+            {
+                BankAccount bankAccount = new BankAccount();
+                bankAccount.ID = Convert.ToInt32(lvBankAccountList.SelectedItems[0].SubItems[0].Text);
+                bankAccount.BankName = lvBankAccountList.SelectedItems[0].SubItems[1].Text;
+                bankAccount.IBAN = lvBankAccountList.SelectedItems[0].SubItems[2].Text;
+                bankAccount.BranchCode = lvBankAccountList.SelectedItems[0].SubItems[3].Text;
+                bankAccount.AccountNumber = lvBankAccountList.SelectedItems[0].SubItems[4].Text;
+                bankAccount.CreatedAt = Convert.ToDateTime(lvBankAccountList.SelectedItems[0].SubItems[5].Text);
+                bankAccount.IsActive = lvBankAccountList.SelectedItems[0].SubItems[6].Text == "Active" ? true : false;
+
+                BankAccountForm baf = new BankAccountForm(bankAccount);
+                baf.ShowDialog();
+                FillListViewBankAccounts();
+            }
+            else
+                MessageBox.Show("No bank account is selected in order to update.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnDeleteBankAccount_Click(object sender, EventArgs e)
+        {
+            if (lvBankAccountList.SelectedItems.Count != 0)
+            {
+                DialogResult dr = MessageBox.Show("Do you want to delete selected bank account?", "Delete Bank Account", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (dr == DialogResult.Yes)
+                    if (new BankAccount().Delete(Convert.ToInt32(lvBankAccountList.SelectedItems[0].Text)))
+                    {
+                        MessageBox.Show("Selected bank account has been deleted successfully.", "Delete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        lvBankAccountList.Items.RemoveAt(lvBankAccountList.SelectedIndices[0]);
+                    }
+                    else
+                        MessageBox.Show("Please make sure there is an internet connection.", "Delete Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+            }
+            else
+                MessageBox.Show("No bank account is selected in order to delete.", "Delete Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnBookAdd_Click(object sender, EventArgs e)
+        {
+            if (txtBookName.Text.Trim() != "" && txtBookAuthor.Text.Trim() != "" && txtBookCategory.Text.Trim() != "" && txtBookPriceInteger.Text.Trim() != "" && txtBookPriceDecimal.Text.Trim() != "" && txtBookStock.Text.Trim() != "")
+            {
+                Book book = new Book();
+                book.BookstoreID = this.bookstore.ID;
+                book.ISBN10 = this.book.ISBN10;
+                book.ISBN13 = this.book.ISBN13;
+                book.Name = txtBookName.Text.Trim();
+                book.Author = txtBookAuthor.Text.Trim();
+                book.Publisher = txtBookPublisher.Text.Trim();
+                book.PublishedDate = dateTimePickerBookPublishedDate.Checked ? dateTimePickerBookPublishedDate.Value : new DateTime?();
+                book.PageCount = txtBookPageCount.Text.Trim() != "" ? Convert.ToInt32(txtBookPageCount.Text.Trim()) : new int?();
+                book.Language = txtBookLanguage.Text.Trim();
+                book.AdditionalInfo = this.book.AdditionalInfo == null ? txtBookAdditionalInfo.Text : this.book.AdditionalInfo;
+                book.CategoryId = this.category.ID;
+                book.SubCategoryId = this.subCategory.ID != 0 ? this.subCategory.ID : new int?();
+                book.Price = Convert.ToDouble(txtBookPriceInteger.Text.Trim() + "," + txtBookPriceDecimal.Text.Trim());
+                book.Stock = Convert.ToInt32(txtBookStock.Text.Trim());
+                book.ThumbURL = this.book.ThumbURL;
+                book.CreatedAt = DateTime.Now;
+                book.IsDeleted = false;
+                if (book.Save())
+                {
+                    MessageBox.Show("Book informations have been recorded successfully.", "Record", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ClearBookSaveFields();
+                    bookSearched = false;
+                }
+                else
+                    MessageBox.Show("Please make sure there is an internet connection.", "Record Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                txtBookBarcode.Focus();
+            }
+            else
+                MessageBox.Show("Please fill the required fields.", "Record Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnBookSearchByBarcode_Click(object sender, EventArgs e)
+        {
+            if (!Validation.ISBN13(txtBookBarcode.Text.Trim()))
+            {
+                MessageBox.Show("Please make sure barcode consists of only numerical characters.", "Barcode Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (txtBookBarcode.Text.Trim() != "")
+            {
+                string tempBarcode = txtBookBarcode.Text;
+                ClearBookSaveFields();
+                txtBookBarcode.Text = tempBarcode;
+
+                this.book = new Book();
+                string[] ISBNs = ISBN.Convert(tempBarcode);
+                if (ISBNs == null)
+                {
+                    MessageBox.Show("Please make sure barcode consists of 13 digits.", "Barcode Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                this.book.ISBN10 = ISBNs[0];
+                this.book.ISBN13 = ISBNs[1];
+
+                //  Amazon Web Service
+                Amazon amazon = new Amazon();
+                DummyBook dummyBookWithAmazon = new DummyBook();
+                string tempXmlPath = amazon.Search(ISBNs[1]);
+                if (tempXmlPath != null)
+                    dummyBookWithAmazon = Deserialize.XML(tempXmlPath);
+
+                if (dummyBookWithAmazon.Name == null)
+                {
+                    //  Google Books API
+                    GoogleBooks googleBooks = new GoogleBooks();
+                    DummyBook dummyBookWithGoogle = new DummyBook();
+                    string JSONData = googleBooks.Search(ISBNs[1]);
+
+                    if (JSONData != null)
+                        dummyBookWithGoogle = Deserialize.JSON(JSONData);
+
+                    if (dummyBookWithGoogle != null && dummyBookWithGoogle.Name != null)
+                        FillBookFields(dummyBookWithGoogle);
+                    else
+                        bookSearchedFailed = true;
+                }
+                else
+                    FillBookFields(dummyBookWithAmazon);
+
+                if (bookSearchedFailed)
+                    MessageBox.Show("No matches were found.", "No Match Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void btnSelectBookCategory_Click(object sender, EventArgs e)
+        {
+            SelectCategoryForm scf = new SelectCategoryForm(this.category, this.subCategory);
+            scf.ShowDialog();
+
+            txtBookCategory.Text = this.category.ID != 0 ? DataAccess.Category.Categories[this.category.ID] : null;
+            txtBookSubCategory.Text = DataAccess.SubCategory.SubCategories[this.subCategory.ID];
+            txtBookPriceInteger.Focus();
+        }
+
+        private void btnClearBookFields_Click(object sender, EventArgs e)
+        {
+            ClearBookSaveFields();
+        }
+
+        private void btnBookDelete_Click(object sender, EventArgs e)
+        {
+            if (dgvBookList.SelectedRows.Count != 0)
+            {
+                DialogResult dr = MessageBox.Show("Do you want to delete selected bank account?", "Delete Bank Account", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (dr == DialogResult.Yes)
+                {
+                    int bookID = Convert.ToInt32(dgvBookList.SelectedRows[0].Cells[0].Value);
+                    if (new Book().Delete(bookID))
+                    {
+                        dgvBookList.Rows.RemoveAt(dgvBookList.SelectedRows[0].Index);
+                        txtTotalBookRecords.Text = dgvBookList.Rows.Count.ToString();
+                    }
+                    else
+                        MessageBox.Show("Please make sure there is an internet connection.", "Delete Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            else
+                MessageBox.Show("No book is selected in order to delete.", "Delete Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnBookUpdate_Click(object sender, EventArgs e)
+        {
+            if (dgvBookList.SelectedRows.Count != 0)
+            {
+                Book book = new Book();
+                book = book.GetByID(Convert.ToInt32(dgvBookList.SelectedRows[0].Cells[0].Value));
+
+                //  Re-Load dgvBookList, if necessary
+                DateTime IsUpdated = book.CreatedAt;
+
+                UpdateBookForm ubf = new UpdateBookForm(book);
+                DialogResult dr = ubf.ShowDialog();
+                if (IsUpdated != book.CreatedAt)
+                    updateDeleteToolStripMenuItem_Click(null, null);
+            }
+            else
+                MessageBox.Show("No book is selected in order to update.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+
+        #endregion
+
+        #region Custom Methods
+        private void CloseAllPanel(params Panel[] ExceptThese)
+        {
+            foreach (Panel pnl in this.Controls.OfType<Panel>())
+                pnl.Visible = false;
+
+            foreach (Panel et in ExceptThese)
+                et.Visible = true;
+        }
+
+        private void ChangeStripItemsEnableDisable(bool Status)
+        {
+            homeToolStripMenuItem.Enabled = Status;
+            loginToolStripMenuItem.Enabled = Status;
+            logoutToolStripMenuItem.Enabled = Status;
+            addToolStripMenuItem.Enabled = Status;
+            updateDeleteToolStripMenuItem.Enabled = Status;
+            bookstoreProfileToolStripMenuItem.Enabled = Status;
+            managerProfileToolStripMenuItem.Enabled = Status;
+            updatePasswordToolStripMenuItem.Enabled = Status;
+            updateEmailToolStripMenuItem.Enabled = Status;
+            bankAccountsToolStripMenuItem.Enabled = Status;
+            ordersToolStripMenuItem.Enabled = Status;
+        }
+
+        private void FillListViewBankAccounts()
+        {
+            lvBankAccountList.Items.Clear();
+            BankAccount bankAccount = new BankAccount();
+            List<BankAccount> list = bankAccount.GetAllRecords(this.owner.ID);
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                lvBankAccountList.Items.Add(list[i].ID.ToString());
+                lvBankAccountList.Items[i].SubItems.Add(list[i].BankName);
+                lvBankAccountList.Items[i].SubItems.Add(list[i].IBAN);
+                lvBankAccountList.Items[i].SubItems.Add(list[i].BranchCode);
+                lvBankAccountList.Items[i].SubItems.Add(list[i].AccountNumber);
+                lvBankAccountList.Items[i].SubItems.Add(list[i].CreatedAt.ToString());
+                lvBankAccountList.Items[i].SubItems.Add(list[i].IsActive ? "Active" : "Inactive");
+            }
+        }
+
+        private void FillBookFields(DummyBook dummyBook)
+        {
+            //  UI Side
+            txtBookName.Text = dummyBook.Name;
+            txtBookAuthor.Text = dummyBook.Author != null ? (dummyBook.Author.LastOrDefault() == ' ' ?
+                dummyBook.Author.Substring(0, dummyBook.Author.Length - 2)
+                : dummyBook.Author) : null;
+            txtBookPublisher.Text = dummyBook.Publisher;
+
+            dateTimePickerBookPublishedDate.Value = Convert.ToDateTime(dummyBook.PublishedDate.Length == 4 ?
+                dummyBook.PublishedDate + "-01-01"
+                : dummyBook.PublishedDate);
+
+            txtBookPageCount.Text = dummyBook.PageCount;
+            txtBookLanguage.Text = dummyBook.Language;
+
+            txtBookAdditionalInfo.Text = Deserialize.HTML(dummyBook.AdditionalInfo);
+            this.book.AdditionalInfo = dummyBook.AdditionalInfo;
+            if (this.book.AdditionalInfo != null)
+            {
+                txtBookAdditionalInfo.ReadOnly = true;
+                txtBookAdditionalInfo.BackColor = Color.LightGray;
+            }
+            this.book.ThumbURL = dummyBook.ThumbURL;
+
+            bookSearched = true;
+            bookSearchedFailed = false;
+        }
+
+        private void ClearBookSaveFields()
+        {
+            txtBookBarcode.Clear();
+            txtBookName.Clear();
+            txtBookAuthor.Clear();
+            txtBookPublisher.Clear();
+            dateTimePickerBookPublishedDate.Value = DateTime.Now;
+            dateTimePickerBookPublishedDate.Checked = true;
+            txtBookPageCount.Clear();
+            txtBookLanguage.Clear();
+            txtBookAdditionalInfo.Clear();
+            txtBookCategory.Clear();
+            txtBookSubCategory.Clear();
+            txtBookPriceInteger.Clear();
+            txtBookPriceDecimal.Text = "00";
+            txtBookStock.Clear();
+
+            txtBookBarcode.Focus();
+            this.AcceptButton = btnBookSearchByBarcode;
+            this.book = new Book();
+
+            txtBookAdditionalInfo.ReadOnly = false;
+            txtBookAdditionalInfo.BackColor = Color.White;
+        }
+        #endregion
+    }
+}
