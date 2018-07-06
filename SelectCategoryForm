@@ -1,0 +1,74 @@
+using DataAccess;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace UI.Desktop
+{
+    public partial class SelectCategoryForm : Form
+    {
+        private Category SuperCategory;
+        private SubCategory SuperSubCategory;
+        
+        #region Constructors
+        public SelectCategoryForm()
+        {
+            InitializeComponent();
+        }
+
+        public SelectCategoryForm(Category SuperCategory, SubCategory SuperSubCategory)
+        {
+            InitializeComponent();
+            this.SuperCategory = SuperCategory;
+            this.SuperSubCategory = SuperSubCategory;
+        }
+        #endregion
+
+        private void btnOk_Click(object sender, EventArgs e)
+        {
+            if (lBoxCategories.SelectedIndex != -1)
+            {
+                SuperCategory.ID = lBoxCategories.SelectedIndex + 1;
+                SuperCategory.Name = lBoxCategories.SelectedItem.ToString();
+
+                if (lBoxSubCategories.SelectedIndex != -1)
+                {
+                    SuperSubCategory.ID = new SubCategory().GetIDByName(lBoxSubCategories.SelectedItem.ToString());
+                    SuperSubCategory.Name = lBoxSubCategories.SelectedItem.ToString();
+                }
+                else
+                    SuperSubCategory.ID = 0;
+            }
+            else
+            {
+                MessageBox.Show("At least category must be selected.", "Category Selection Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+
+        private void lBoxCategories_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (lBoxCategories.SelectedIndex != -1)
+            {
+                lBoxSubCategories.Items.Clear();
+                SubCategory subCategory = new SubCategory();
+
+                List<SubCategory> list = subCategory.GetByCategoryID(lBoxCategories.SelectedIndex + 1);
+                foreach (var sc in list)
+                    lBoxSubCategories.Items.Add(sc.Name);
+            }
+        }
+    }
+}
