@@ -1,0 +1,57 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BusinessRules
+{
+    public class Encryption
+    {
+        public static bool CheckInfo(string InputData, string Salt, string HashCode)
+        {
+            if (MD5(InputData, Salt) == HashCode)
+                return true;
+            else
+                return false;
+        }
+
+        public static string MD5(string InputData, string Salt)
+        {
+            if (InputData == null || InputData.Length == 0 || Salt == null || Salt.Length == 0)
+                return null;
+
+            MD5 md5 = new MD5CryptoServiceProvider();
+            byte[] encrypted = Encoding.Default.GetBytes(InputData + Salt);
+            byte[] result = md5.ComputeHash(encrypted);
+
+            string[] md5hashArray = System.BitConverter.ToString(result).Split('-');
+            string md5hashCode = "";
+
+            for (int i = 0; i < md5hashArray.Length; i++)
+                md5hashCode = md5hashCode + md5hashArray[i];
+
+            return md5hashCode;
+        }
+
+        public static string SaltData()
+        {
+            Random rnd = new Random();
+            string salt = "";
+            int digits = rnd.Next(20, 33);   //  Between 20 and 32 (included)
+            for (int i = 0; i < digits; i++)
+                salt = salt + ((char)rnd.Next(65, 91)).ToString();
+            return salt;
+        }
+
+        public static string ActivationCode()
+        {
+            Random rnd = new Random();
+            string salt = "";
+            for (int i = 0; i < 10; i++)
+                salt = salt + ((char)rnd.Next(65, 91)).ToString();
+            return salt;
+        }
+    }
+}
