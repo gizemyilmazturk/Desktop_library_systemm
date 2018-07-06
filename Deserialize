@@ -1,0 +1,130 @@
+using BusinessRules;
+using DataAccess;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Configuration;
+using System.Data;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace UI.Desktop
+{
+    public partial class UpdateBookForm : Form
+    {
+        private Book Book;
+        private Category Category;
+        private SubCategory SubCategory;
+
+        private void UpdateBookForm_Load(object sender, EventArgs e)
+        {
+            if (this.Book != null)
+                FillBookFields();
+        }
+
+        #region Constructor
+        public UpdateBookForm(Book Book)
+        {
+            InitializeComponent();
+            
+            this.Book = Book;
+            this.Category = new Category();
+            this.SubCategory = new SubCategory();
+            this.Category.ID = this.Book.CategoryId;
+            this.SubCategory.ID = this.Book.SubCategoryId != null ? Convert.ToInt32(this.Book.SubCategoryId) : 0;
+        }
+        #endregion
+
+        #region Buttons
+        private void btnSelectBookCategory_Click(object sender, EventArgs e)
+        {
+            SelectCategoryForm scf = new SelectCategoryForm(this.Category, this.SubCategory);
+            scf.ShowDialog();
+
+            txtBookCategory.Text = DataAccess.Category.Categories[this.Category.ID];
+            txtBookSubCategory.Text = DataAccess.SubCategory.SubCategories[this.SubCategory.ID];
+            txtBookPriceInteger.Focus();
+        }
+
+        private void btnBookUpdate_Click(object sender, EventArgs e)
+        {
+            if (txtBookName.Text.Trim() != "" && txtBookAuthor.Text.Trim() != "" && txtBookCategory.Text.Trim() != "" && txtBookPriceInteger.Text.Trim() != "" && txtBookPriceDecimal.Text.Trim() != "" && txtBookStock.Text.Trim() != "")
+            {
+                Book book = new Book();
+                book.ID = this.Book.ID;
+
+                book.Name = txtBookName.Text.Trim();
+                book.Author = txtBookAuthor.Text.Trim();
+                book.Publisher = txtBookPublisher.Text.Trim();
+                book.PublishedDate = dateTimePickerBookPublishedDate.Checked ? dateTimePickerBookPublishedDate.Value : new DateTime?();
+                book.PageCount = txtBookPageCount.Text.Trim() != "" ? Convert.ToInt32(Validation.Number(txtBookPageCount.Text)) : new int?();
+                book.Language = txtBookLanguage.Text.Trim();
+                book.AdditionalInfo = txtBookAdditionalInfo.Text.Trim();
+                book.CategoryId = this.Category.ID;
+                book.SubCategoryId = this.SubCategory.ID != 0 ? this.SubCategory.ID : new int?();
+                book.Price = Convert.ToDouble(
+                    Validation.Number(txtBookPriceInteger.Text) +
+                    "," +
+                    Validation.Number(txtBookPriceDecimal.Text));
+
+                book.Stock = Convert.ToInt32(Validation.Number(txtBookStock.Text));
+                book.CoverFrontURL = this.Book.CoverFrontURL;
+                book.CoverBackURL = this.Book.CoverBackURL;
+                book.ThumbURL = this.Book.ThumbURL != "" ? this.Book.ThumbURL : null;
+                book.CreatedAt = this.Book.CreatedAt = DateTime.Now;
+                book.IsDeleted = this.Book.IsDeleted;
+
+                if (book.Update())
+                {
+                    MessageBox.Show("Book informations have been updated successfully.");
+                }
+                else
+                {
+                    MessageBox.Show("An error occured. Try again.");
+                }
+            }
+            else
+                MessageBox.Show("Please fill the required fields.", "Update Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+        #endregion
+
+        #region Custom Methods
+        private void FillBookFields()
+        {
+            txtBookName.Text = this.Book.Name;
+            txtBookAuthor.Text = this.Book.Author;
+            txtBookPublisher.Text = this.Book.Publisher;
+
+            if (this.Book.PublishedDate != null)
+                dateTimePickerBookPublishedDate.Value = this.Book.PublishedDate.Value;
+            else
+            {
+                dateTimePickerBookPublishedDate.Value = DateTime.Now;
+                dateTimePickerBookPublishedDate.Checked = false;
+            }
+            
+            txtBookPageCount.Text = this.Book.PageCount != null ? this.Book.PageCount.ToString() : null;
+            txtBookLanguage.Text = this.Book.Language;
+            txtBookAdditionalInfo.Text = this.Book.AdditionalInfo;
+            txtBookCategory.Text = DataAccess.Category.Categories[this.Book.CategoryId];
+            txtBookSubCategory.Text = DataAccess.SubCategory.SubCategories[this.Book.SubCategoryId != null ? Convert.ToInt32(this.Book.SubCategoryId) : 0];
+            txtBookPriceInteger.Text = this.Book.Price.ToString().Split(',')[0];
+            txtBookPriceDecimal.Text = this.Book.Price.ToString().Split(',').Count() == 2 ? 
+                this.Book.Price.ToString().Split(',')[1]
+                : "00";
+            txtBookStock.Text = this.Book.Stock.ToString();
+        }
+        #endregion
+    }
+}
